@@ -1,0 +1,62 @@
+train <- train_gbW7HTd
+test <- test_2AFBew7
+#Multivariate Analysis
+str(train)
+fivenum(train$ID,train$Age)
+fivenum(train$Age)
+fivenum(train$Hours.Per.Week)
+?fivenum
+apply(train,2,function(x){length(unique(x))})
+as.matrix(prop.table(table(train$Race)))
+head(sort(table(train$Native.Country),decreasing =T),25)
+head(round(sort(prop.table(table(train$Income.Group)),decreasing=T),2),10)
+#Missing Value Treatment
+names(train)
+table(is.na(train))
+train <- read.csv("train_gbW7HTd.csv",header = TRUE,na.strings = "")
+train <- read.csv(file.choose(),header = TRUE,na.strings = "")
+colSums(is.na(train))
+table(is.na(train))
+test <- read.csv(file.choose(),header = T,na.strings = "")
+table(is.na(test))
+colSums(is.na(test))
+library(mlr)
+imput <- impute(train,classes = list(factor=imputeMode()))
+train <- imput$data
+colSums(is.na(train))
+imput <- impute(test,classes = list(factor=imputeMode()))
+test <- imput$data
+colSums(is.na(test))
+#Outlier treatment
+library(ggplot2)
+names(train)
+ggplot(train,aes(ID,Age))+geom_jitter()
+ggplot(train,aes(ID,Hours.Per.Week))+geom_jitter()
+ggplot(train,aes(ID,Native.Country))+geom_jitter()
+sapply(train,class)
+as.matrix(prop.table(table(train$Workclass)))
+#VariableTransformation
+library(car)
+train$Workclass <- recode(train$Workclass,"c('State-gov','Self-emp-inc','Federal-gov','Without-pay','Never-worked')='Others'")
+test$Workclass <- recode(test$Workclass,"c('State-gov','Self-emp-inc','Federal-gov','Without-pay','Never-worked')='Others'")
+as.matrix(prop.table(table(train$Workclass)))
+#predictive modeling
+#Tree
+table(train$Income.Group)
+train$Income.Group <- ifelse(train$Income.Group=="<=50K",0,1)
+train <- subset(train,select = -c(ID))
+library(rpart)
+set.seed(333)
+train.tree <- rpart(Income.Group~.,data = train,method = "class",control = rpart.control(minsplit = 20, minbucket = 100, maxdepth = 10),xval=5)
+summary(train.tree)
+library(rpart.plot)
+rpart.plot(train.tree)
+#Predictions
+pretrain <- predict(train.tree,newdata = train,type="class")
+pretest <- predict(train.tree,newdata = test,type="class")
+#Analyze results
+library(caret)
+confusionMatrix(pretrain,train$Income.Group)
+solution <- data.frame(ID=test$ID,Income.Group=pretest)
+solution$Income.Group <- ifelse(solution$Income.Group=="0","<=50K",">50K")
+write.csv(solution,file = "solution.csv")
